@@ -1,0 +1,44 @@
+name: Build Artifacts
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-artifacts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Pack npm tarball
+        run: npm pack
+
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: skills-dist
+          path: dist/
+
+      - name: Upload npm package
+        uses: actions/upload-artifact@v4
+        with:
+          name: skills-npm-package
+          path: skills-*.tgz
