@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { parseLinkOptions } from './link.ts';
@@ -11,11 +11,15 @@ describe('link command', () => {
   let env: Record<string, string>;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `skills-link-test-${Date.now()}`);
+    testDir = mkdtempSync(join(tmpdir(), 'skills-link-test-'));
     homeDir = join(testDir, 'home');
-    mkdirSync(testDir, { recursive: true });
     mkdirSync(homeDir, { recursive: true });
-    env = { HOME: homeDir };
+    env = {
+      HOME: homeDir,
+      USERPROFILE: homeDir,
+      LOCALAPPDATA: join(homeDir, 'AppData', 'Local'),
+      APPDATA: join(homeDir, 'AppData', 'Roaming'),
+    };
   });
 
   afterEach(() => {
@@ -124,6 +128,37 @@ This is a test skill.
       expect(result.stdout).toContain('Successfully linked');
       expect(result.exitCode).toBe(0);
       expect(existsSync(join(homeDir, '.claude', 'skills', 'test-skill', 'SKILL.md'))).toBe(true);
+    });
+
+    it('should warn about unmatched skills while linking matched skills', () => {
+      createGlobalSkill('skill-one');
+
+      const result = runCli(
+        ['link', 'skill-one', 'missing-skill', '-a', 'claude-code', '-y'],
+        testDir,
+        env
+      );
+
+      expect(result.stdout).toContain('Global skills not found');
+      expect(result.stdout).toContain('missing-skill');
+      expect(result.stdout).toContain('Successfully linked 1 link(s) for 1 skill(s)');
+      expect(result.exitCode).toBe(0);
+      expect(existsSync(join(homeDir, '.claude', 'skills', 'skill-one', 'SKILL.md'))).toBe(true);
+    });
+
+    it('should report successful link count separately from skill count', () => {
+      createGlobalSkill('test-skill');
+
+      const result = runCli(
+        ['link', 'test-skill', '-a', 'claude-code', 'continue', '-y'],
+        testDir,
+        env
+      );
+
+      expect(result.stdout).toContain('Successfully linked 2 link(s) for 1 skill(s)');
+      expect(result.exitCode).toBe(0);
+      expect(existsSync(join(homeDir, '.claude', 'skills', 'test-skill', 'SKILL.md'))).toBe(true);
+      expect(existsSync(join(homeDir, '.continue', 'skills', 'test-skill', 'SKILL.md'))).toBe(true);
     });
   });
 });

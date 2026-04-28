@@ -144,15 +144,22 @@ export async function runLink(inputSkills: string[], options: LinkOptions = {}):
   }
 
   let selectedSkills: InstalledSkill[];
+  let missingSkillNames: string[] = [];
   if (options.all) {
     selectedSkills = installedSkills;
   } else if (inputSkills.length > 0) {
     const requested = new Set(inputSkills.map((skill) => skill.toLowerCase()));
     selectedSkills = installedSkills.filter((skill) => requested.has(skill.name.toLowerCase()));
+    const matchedNames = new Set(selectedSkills.map((skill) => skill.name.toLowerCase()));
+    missingSkillNames = inputSkills.filter((skill) => !matchedNames.has(skill.toLowerCase()));
 
     if (selectedSkills.length === 0) {
       p.log.error(`No matching global skills found for: ${inputSkills.join(', ')}`);
       return;
+    }
+
+    if (missingSkillNames.length > 0) {
+      p.log.warn(`Global skills not found: ${missingSkillNames.join(', ')}`);
     }
   } else if (options.yes) {
     selectedSkills = installedSkills;
@@ -242,6 +249,7 @@ export async function runLink(inputSkills: string[], options: LinkOptions = {}):
   spinner.stop('Linking complete');
 
   const failed = results.filter((result) => !result.success);
+  const successfulLinkCount = results.filter((result) => result.success).length;
   const succeededSkillNames = new Set(
     results.filter((result) => result.success).map((result) => result.skill)
   );
@@ -259,7 +267,11 @@ export async function runLink(inputSkills: string[], options: LinkOptions = {}):
   }
 
   if (succeededSkillNames.size > 0) {
-    p.outro(pc.green(`Successfully linked ${succeededSkillNames.size} skill(s).`));
+    p.outro(
+      pc.green(
+        `Successfully linked ${successfulLinkCount} link(s) for ${succeededSkillNames.size} skill(s).`
+      )
+    );
   } else {
     p.outro(pc.red('Failed to link any skills.'));
   }
