@@ -28,13 +28,16 @@ export function runCli(
   timeout?: number
 ): { stdout: string; stderr: string; exitCode: number } {
   try {
-    const output = execSync(`node "${CLI_PATH}" ${args.join(' ')}`, {
-      encoding: 'utf-8',
-      cwd,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: env ? { ...process.env, ...env } : undefined,
-      timeout: timeout ?? 30000,
-    });
+    const output = execSync(
+      `node --no-warnings --experimental-strip-types "${CLI_PATH}" ${args.join(' ')}`,
+      {
+        encoding: 'utf-8',
+        cwd,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: env ? { ...process.env, ...env } : undefined,
+        timeout: timeout ?? 30000,
+      }
+    );
     return { stdout: stripAnsi(output), stderr: '', exitCode: 0 };
   } catch (error: any) {
     return {
@@ -56,12 +59,15 @@ export function runCliWithInput(
   cwd?: string
 ): { stdout: string; stderr: string; exitCode: number } {
   try {
-    const output = execSync(`node "${CLI_PATH}" ${args.join(' ')}`, {
-      encoding: 'utf-8',
-      cwd,
-      input: input + '\n',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
+    const output = execSync(
+      `node --no-warnings --experimental-strip-types "${CLI_PATH}" ${args.join(' ')}`,
+      {
+        encoding: 'utf-8',
+        cwd,
+        input: input + '\n',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }
+    );
     return { stdout: stripAnsi(output), stderr: '', exitCode: 0 };
   } catch (error: any) {
     return {
