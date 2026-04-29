@@ -132,14 +132,9 @@ export async function fetchAuditData(
   }
 }
 
-interface PendingTelemetry {
-  promise: Promise<void>;
-  controller: AbortController;
-}
-
 // Pending telemetry promises — awaited before CLI exit so we don't lose data,
 // but never block the main workflow.
-const pendingTelemetry: PendingTelemetry[] = [];
+const pendingTelemetry: Promise<void>[] = [];
 
 export function track(data: TelemetryData): void {
   if (!isEnabled()) return;
@@ -164,16 +159,12 @@ export function track(data: TelemetryData): void {
       }
     }
 
-    const controller = new AbortController();
-
     // Fire and forget during the workflow, but track the promise so
-    // flushTelemetry() can await or abort it before the process exits.
-    const promise = fetch(`${TELEMETRY_URL}?${params.toString()}`, {
-      signal: controller.signal,
-    })
+    // flushTelemetry() can await it before the process exits.
+    const p = fetch(`${TELEMETRY_URL}?${params.toString()}`)
       .catch(() => {})
       .then(() => {});
-    pendingTelemetry.push({ promise, controller });
+    pendingTelemetry.push(p);
   } catch {
     // Silently fail - telemetry should never break the CLI
   }
@@ -186,25 +177,6 @@ export function track(data: TelemetryData): void {
  */
 export async function flushTelemetry(timeoutMs = 5000): Promise<void> {
   if (pendingTelemetry.length === 0) return;
-
-  let timeout: ReturnType<typeof setTimeout> | undefined;
-  const timeoutPromise = new Promise<'timeout'>((resolve) => {
-    timeout = setTimeout(() => resolve('timeout'), timeoutMs);
-    timeout.unref?.();
-  });
-
-  const result = await Promise.race([
-    Promise.all(pendingTelemetry.map((entry) => entry.promise)).then(() => 'settled' as const),
-    timeoutPromise,
-  ]);
-
-  if (timeout) {
-    clearTimeout(timeout);
-  }
-
-  if (result === 'timeout') {
-    for (const entry of pendingTelemetry) {
-      entry.controller.abort();
-    }
-  }
+  const timeout = new Promise<void>((resolve) => setTimeout(resolve, timeoutMs));
+  await Promise.race([Promise.all(pendingTelemetry), timeout]);
 }
